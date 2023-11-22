@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         国科大课程评价自动完成工具
 // @namespace    http://tampermonkey.net/
-// @version      0.8
+// @version      0.8.5
 // @description  try to take over the world!
 // @author       You
 // @match        https://bkkcpj.ucas.ac.cn/*
@@ -13,7 +13,7 @@
 (function () {
     const text = "挺好的，很满意。";
     const courseList = "https://bkkcpj.ucas.ac.cn/#/myCoursePoll/page";
-    // const writeRemark = "https://bkkcpj.ucas.ac.cn/#/myPoll/fill/*";
+    const FormPageUrl = "https://bkkcpj.ucas.ac.cn/#/myPoll/fill/";
     // const hostName = window.location.protocol + "//" + window.location.host + "/";
     // 网络不佳时要延长这些数据 单位：毫秒
     // 初始界面的加载时间   如果初始界面未完成加载，延长此处
@@ -24,6 +24,8 @@
     const timeout3 = 1000;
     // 设置是否要跳过已完成的问卷。
     const skipFinishedForm = true;
+    // 设置是否要手动打开填写界面，不自动转跳
+    const enableManualOpenForm = true;
 
     var links = [];
 
@@ -99,6 +101,7 @@
     }
 
     function AutoFill(f) {
+        if (typeof FunName !== "function") f = () => { };
         // console.log(text);
         var form = document.getElementsByClassName("el-form");
         if (form.length == 0) return f();
@@ -120,7 +123,8 @@
             // multi choice
             var checkboxs = checklist[0].getElementsByClassName("el-checkbox__inner");
             if (checkboxs.length > 0) {
-                checkboxs[0].click();
+                if(!checkboxs[0].parentElement.classList.contains("is-checked"))
+                    checkboxs[0].click();
                 console.log("Multi Check: " + i);
                 continue;
             }
@@ -203,8 +207,13 @@
         Waiting(() => { fillNext(0) }, timeout3);
     };
     if (window.location.href == courseList) {
+        if (enableManualOpenForm) {
+            myFloatingNotify("Manual Open Form Mode Enabled!");
+            return;
+        }
         Waiting(FindUnfinished, timeout1, "Waiting For page loading...");
     }
-    // else if (window.location.href.lastIndexOf(writeRemark) != -1)
-    //     setTimeout(AutoFill, 1000);
+    if (enableManualOpenForm && window.location.href.indexOf(FormPageUrl) != -1) {
+        Waiting(AutoFill, timeout2, "Waiting For page loading...");
+    }
 })();
