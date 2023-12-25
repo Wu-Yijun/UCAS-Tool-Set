@@ -25,7 +25,7 @@
     // 设置是否要跳过已完成的问卷。
     const skipFinishedForm = true;
     // 设置是否要手动打开填写界面，不自动转跳
-    const enableManualOpenForm = true;
+    const enableManualOpenForm = false;
 
     var links = [];
 
@@ -101,7 +101,7 @@
     }
 
     function AutoFill(f) {
-        if (typeof FunName !== "function") f = () => { };
+        if (typeof f !== "function") f = () => { };
         // console.log(text);
         var form = document.getElementsByClassName("el-form");
         if (form.length == 0) return f();
