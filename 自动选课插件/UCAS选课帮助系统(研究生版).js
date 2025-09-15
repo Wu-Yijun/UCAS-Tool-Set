@@ -1,16 +1,15 @@
 // ==UserScript==
 // @name         UCAS 选课帮助系统(研究生版)
 // @namespace    http://tampermonkey.net/
-// @version      1.5
+// @version      1.6
 // @description  提前输入课程选择, 在选课开通后自动快速勾选
 // @author       Aluria
-// @match        https://xkgodj.ucas.ac.cn/*
-// @match        http://xkgo.ucas.ac.cn:3000/*
+// @match        *://*.ucas.ac.cn:*/*
 // @icon         https://ucas.ac.cn/publish/xww/images/icon1.png
 // @grant        none
 // ==/UserScript==
 
-const VERSION = "1.5";
+const VERSION = "1.6";
 
 const config = {
     site: ["https://xkgodj.ucas.ac.cn/", "http://xkgo.ucas.ac.cn:3000/"],
@@ -24,6 +23,13 @@ const config = {
 
 const state = {
     editing: false,
+
+    searchIndex: -1,
+    table_row: [], // HTML Collection
+    tableStr: [],
+    searchExist: false,
+    show_animate: false,
+    closed: false,
 };
 
 function myFloatingNotify(text, dt) {
@@ -153,7 +159,15 @@ const courseList = [
 function deleteClick(event) {
     const index = parseInt(event.target.getAttribute("data-index"));
     if (index === null) return;
-    saveTable([index]);
+    if (state.editing) {
+        saveTable([index]);
+    } else {
+        const courseList = JSON.parse(
+            localStorage.getItem("courseList") || "[]",
+        );
+        courseList.splice(index, 1);
+        localStorage.setItem("courseList", JSON.stringify(courseList));
+    }
     showTable();
 }
 
@@ -205,7 +219,16 @@ function createTable(courseList) {
                 }
             } else if (state.editing && identifier !== "line_number") {
                 td.innerHTML =
-                    `<input type="text" value="${cell.toString()}" data-index="${index}" data-field="${identifier}">`;
+                    `<input type="text" value="${cell}" data-index="${index}" data-field="${identifier}">`;
+            } else if (
+                identifier === "line_number" &&
+                index === state.searchIndex
+            ) {
+                if (state.searchExist) {
+                    td.innerText = "✅️ " + cell;
+                } else {
+                    td.innerText = "❌ " + cell;
+                }
             } else {
                 td.innerText = cell;
             }
@@ -264,6 +287,9 @@ function saveTable(skipped = [], addOne = false) {
 }
 
 function showTable() {
+    if (state.closed) {
+        return;
+    }
     // |   | 课程中文名 | 课程ID | 教师 | 状态 | 操作 |
     // |---|-----------|--------|------|-----|------|
     // | 1 | 高等数学   | 123456 | 张三 | 已选中 | [删除] |
@@ -284,6 +310,26 @@ function showTable() {
     div.innerHTML = `<h2>UCAS 选课帮助系统(研究生版, v${VERSION})</h2>
     * 目前仅通过课程ID进行自动选课.
     <h3>已保存课程列表</h3>`;
+    (() => {
+        div.style.cursor = "move";
+        let isDragging = false, offsetX, offsetY;
+        div.addEventListener("mousedown", (e) => {
+            isDragging = true;
+            offsetX = e.clientX - div.getBoundingClientRect().left;
+            offsetY = e.clientY - div.getBoundingClientRect().top;
+            div.style.userSelect = "none";
+        });
+        document.addEventListener("mousemove", (e) => {
+            if (!isDragging) return;
+            div.style.left = (e.clientX - offsetX) + "px";
+            div.style.top = (e.clientY - offsetY) + "px";
+            div.style.right = "unset";
+        });
+        document.addEventListener("mouseup", () => {
+            isDragging = false;
+            div.style.userSelect = "auto";
+        });
+    })();
 
     const courseList = JSON.parse(localStorage.getItem("courseList") || "[]");
     div.appendChild(createTable(courseList));
@@ -301,6 +347,7 @@ function showTable() {
         const editDoneButton = document.createElement("button");
         editDoneButton.innerText = "保存";
         editDoneButton.style.margin = "10px";
+        editDoneButton.style.backgroundColor = "lightgreen";
         editDoneButton.onclick = () => {
             state.editing = false;
             saveTable();
@@ -321,23 +368,56 @@ function showTable() {
     };
     div.appendChild(editButton);
 
-    const closeButton = document.createElement("button");
-    closeButton.innerText = "关闭";
-    closeButton.style.margin = "10px";
-    closeButton.onclick = () => {
-        div.remove();
-    };
-    div.appendChild(closeButton);
-
     const manualSelect = document.createElement("button");
-    manualSelect.innerText = "手动触发选课";
+    manualSelect.innerText = "点击一键选课";
     manualSelect.style.margin = "10px";
+    manualSelect.style.backgroundColor = "lightgreen";
     manualSelect.onclick = () => {
         selCourses();
         // refresh list
         showTable();
     };
     div.appendChild(manualSelect);
+
+    const manualSearch = document.createElement("button");
+    manualSearch.innerHTML =
+        "<code style='color: darkred;font-weight: bold;background-color: lightgray;padding: 0px 5px;border-radius: 3px;'>～</code> 键依序查找";
+    manualSearch.style.margin = "10px";
+    manualSearch.onclick = () => {
+        state.table_row = document.querySelectorAll("tr:not(#ucas-course-helper tr)");
+        state.tableStr = [];
+        for (let i = 0; i < state.table_row.length; i++) {
+            state.tableStr.push(
+                state.table_row[i].innerText,
+            );
+        }
+        state.searchIndex = 0;
+        searchWithIndex();
+        showTable();
+    };
+    div.appendChild(manualSearch);
+
+    const ani_input = document.createElement("span");
+    ani_input.innerHTML = "<input type='checkbox'>显示滚动动画 ";
+    const ani_checkbox = ani_input.children[0];
+    ani_checkbox.checked = state.show_animate;
+    ani_checkbox.addEventListener("change", () => {
+        console.log("11111");
+        state.show_animate = ani_checkbox.checked;
+    });
+    div.appendChild(ani_input);
+
+    const closeButton = document.createElement("button");
+    closeButton.innerText = "关闭";
+    closeButton.style.margin = "10px";
+    closeButton.style.backgroundColor = "orangered";
+    closeButton.style.fontWeight = "bold";
+    closeButton.style.color = "white";
+    closeButton.onclick = () => {
+        div.remove();
+        state.closed = true;
+    };
+    div.appendChild(closeButton);
 
     document.getElementById("ucas-course-helper")?.remove();
     document.body.appendChild(div);
@@ -392,8 +472,9 @@ function selCourses() {
     const courseList = JSON.parse(localStorage.getItem("courseList") || "[]");
     let sel = false;
     const selList = [];
-    const tableList = document.getElementsByClassName("table");
+    const tableList = document.getElementsByTagName("table");
 
+    // debugger;
     for (let jj = 0; jj < tableList.length; jj++) {
         try {
             const items = tableList[jj].tBodies[0].children;
@@ -404,11 +485,11 @@ function selCourses() {
             }
             // queryThroughIdFull
             for (const course of courseList) {
-                if (course.selected) {
-                    continue;
-                }
                 const index = findIndex(course.idFull, itemStr);
                 if (index && selectItem(items[index])) {
+                    if (course.selected) {
+                        continue;
+                    }
                     course.selected = true;
                     sel = true;
                     continue;
@@ -453,15 +534,85 @@ function selCourses() {
     );
 }
 
-function main() {
-    const href = window.location.href;
-    if (href.endsWith(config.url) || href.endsWith(config.urlSj)) {
-        showTable();
-    } else {
-        selCourses();
-    }
+function scrollHighlight(elem) {
+    if (!elem) return;
+
+    const bh = state.show_animate ? "smooth" : "instant";
+    // 滚动到元素位置
+    elem.scrollIntoView({ behavior: bh, block: "center" });
+
+    // 保存原始背景色
+    const oldBg = elem.style.backgroundColor;
+    const oldShadow = elem.style.boxShadow;
+
+    // 设置临时高亮
+    elem.style.backgroundColor = "yellow";
+    elem.style.boxShadow = "0 0 10px 2px yellow";
+
+    // 渐变恢复
+    let opacity = 1.0;
+    const step = 0.025; // 每次降低的透明度
+    const interval = 50; // 每次间隔(ms)
+
+    const timer = setInterval(() => {
+        opacity -= step;
+        elem.style.backgroundColor = `rgba(255, 255, 0, ${opacity})`;
+
+        if (opacity <= 0) {
+            clearInterval(timer);
+            // 恢复原始背景色
+            elem.style.backgroundColor = oldBg;
+            elem.style.boxShadow = oldShadow;
+        }
+    }, interval);
 }
 
-setTimeout(main, 1000);
+function searchWithIndex() {
+    const id = state.searchIndex;
+    const courseList = JSON.parse(localStorage.getItem("courseList") || "[]");
+    const course = courseList[id];
+    if (!course) {
+        state.searchExist = false;
+        return false;
+    }
+    const index = findIndex(course.idFull, state.tableStr);
+    if (!index) {
+        myFloatingNotify(
+            `Cannot find ${course.name} with id ${course.idFull}!`,
+        );
+        state.searchExist = false;
+        return false;
+    }
+    scrollHighlight(state.table_row[index]);
+    state.searchExist = true;
+    return true;
+}
+
+function main() {
+    window.addEventListener("keydown", function (e) {
+        if (e.code !== "Backquote" && e.key !== "`") {
+            return;
+        }
+        if (state.searchIndex < 0) {
+            return;
+        }
+        state.searchIndex += 1;
+        searchWithIndex();
+        showTable();
+    });
+    showTable();
+
+    // const href = window.location.href;
+    // if (href.endsWith(config.url) || href.endsWith(config.urlSj)) {
+    //     showTable();
+    // } else {
+    //     // showTable();
+    //     // selCourses();
+    //     showTable(); // refresh
+    // }
+}
+
+setTimeout(main, 200);
 
 // selCourses();
+console.log(main);
