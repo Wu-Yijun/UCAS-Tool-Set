@@ -1,15 +1,16 @@
 // ==UserScript==
 // @name         UCAS 选课帮助系统(研究生版)
 // @namespace    http://tampermonkey.net/
-// @version      1.7
+// @version      1.8
 // @description  提前输入课程选择, 在选课开通后自动快速勾选
 // @author       Aluria
 // @match        *://*.ucas.ac.cn:*/*
 // @icon         https://ucas.ac.cn/publish/xww/images/icon1.png
-// @grant        none
+// @grant        GM_setValue
+// @grant        GM_getValue
 // ==/UserScript==
 
-const VERSION = "1.7";
+const VERSION = "1.8";
 
 const config = {
     site: ["https://xkgodj.ucas.ac.cn/", "http://xkgo.ucas.ac.cn:3000/"],
@@ -162,11 +163,9 @@ function deleteClick(event) {
     if (state.editing) {
         saveTable([index]);
     } else {
-        const courseList = JSON.parse(
-            localStorage.getItem("courseList") || "[]",
-        );
+        const courseList = GM_getValue("courseList", []);
         courseList.splice(index, 1);
-        localStorage.setItem("courseList", JSON.stringify(courseList));
+        GM_setValue("courseList", courseList);
     }
     showTable();
 }
@@ -283,7 +282,7 @@ function saveTable(skipped = [], addOne = false) {
             selected: false,
         });
     }
-    localStorage.setItem("courseList", JSON.stringify(newList));
+    GM_setValue("courseList", newList);
 }
 
 function showTable() {
@@ -335,7 +334,7 @@ function showTable() {
     copyButton.innerText = "导出表格到剪切板";
     copyButton.style.margin = "10px";
     copyButton.onclick = async () => {
-        const old = JSON.parse(localStorage.getItem("courseList") || "[]");
+        const old = GM_getValue("courseList", []);
         await navigator.clipboard.writeText(JSON.stringify(old));
         myFloatingNotify("复制完成!");
     };
@@ -366,8 +365,8 @@ function showTable() {
                     );
                 }
             }
-            const old = JSON.parse(localStorage.getItem("courseList") || "[]");
-            localStorage.setItem("courseList", JSON.stringify(json));
+            const old = GM_getValue("courseList", []);
+            GM_setValue("courseList", json);
             await navigator.clipboard.writeText(JSON.stringify(old));
         } catch (e) {
             console.log(e);
@@ -397,7 +396,7 @@ function showTable() {
     });
     div.appendChild(pasteArea);
 
-    const courseList = JSON.parse(localStorage.getItem("courseList") || "[]");
+    const courseList = GM_getValue("courseList", []);
     div.appendChild(createTable(courseList));
 
     if (state.editing) {
@@ -440,7 +439,6 @@ function showTable() {
     manualQuery.style.backgroundColor = "lightblue";
     manualQuery.onclick = autoQuery;
     div.appendChild(manualQuery);
-
 
     const manualSelect = document.createElement("button");
     manualSelect.innerText = "点击一键选课";
@@ -545,7 +543,7 @@ function findIndex(str, list, starting = 0) {
 }
 
 function selCourses() {
-    const courseList = JSON.parse(localStorage.getItem("courseList") || "[]");
+    const courseList = GM_getValue("courseList", []);
     let sel = false;
     const selList = [];
     const tableList = document.getElementsByTagName("table");
@@ -584,7 +582,7 @@ function selCourses() {
         }
         notifyMe(str);
 
-        localStorage.setItem("courseList", JSON.stringify(courseList));
+        GM_setValue("courseList", courseList);
     } else {
         let str = "啥也没选上！";
         const except = courseList.filter((c) => c.selected).map((c) => c.name);
@@ -645,7 +643,7 @@ function scrollHighlight(elem) {
 
 function searchWithIndex() {
     const id = state.searchIndex;
-    const courseList = JSON.parse(localStorage.getItem("courseList") || "[]");
+    const courseList = GM_getValue("courseList", []);
     const course = courseList[id];
     if (!course) {
         state.searchExist = false;
@@ -670,11 +668,16 @@ function autoQuery() {
 }
 
 function main() {
+    // GM_setValue
+    if (GM_getValue("courseList", []).length === 0) {
+        GM_setValue(
+            "courseList",
+            JSON.parse(localStorage.getItem("courseList") || "[]"),
+        );
+    }
+
     window.addEventListener("keydown", function (e) {
         if (e.code !== "Backquote" && e.key !== "`") {
-            return;
-        }
-        if (state.searchIndex < 0) {
             return;
         }
         state.searchIndex += 1;
@@ -692,6 +695,13 @@ function main() {
     //     showTable(); // refresh
     // }
 }
+
+GM_setValue = GM_setValue ?? function (key, val) {
+    localStorage.setItem(key, JSON.stringify(val));
+};
+GM_getValue = GM_getValue ?? function (key, val) {
+    JSON.parse(localStorage.getItem(key) ?? JSON.stringify(val));
+};
 
 setTimeout(main, 50);
 
