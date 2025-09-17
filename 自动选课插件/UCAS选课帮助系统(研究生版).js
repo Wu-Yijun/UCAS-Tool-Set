@@ -662,6 +662,21 @@ function searchWithIndex() {
     return true;
 }
 
+function restartSearch() {
+    state.table_row = document.querySelectorAll(
+        "tr:not(#ucas-course-helper tr)",
+    );
+    state.tableStr = [];
+    for (let i = 0; i < state.table_row.length; i++) {
+        state.tableStr.push(
+            state.table_row[i].innerText,
+        );
+    }
+    state.searchIndex = 0;
+    searchWithIndex();
+    showTable();
+}
+
 function autoQuery() {
     $("#courseType>option").prop("selected", true);
     $("#submitBtn").click();
@@ -678,6 +693,10 @@ function main() {
 
     window.addEventListener("keydown", function (e) {
         if (e.code !== "Backquote" && e.key !== "`") {
+            return;
+        }
+        if (state.searchIndex === -1) {
+            restartSearch();
             return;
         }
         state.searchIndex += 1;
