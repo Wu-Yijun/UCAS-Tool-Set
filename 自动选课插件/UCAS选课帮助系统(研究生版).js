@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         UCAS 选课帮助系统(研究生版)
 // @namespace    http://tampermonkey.net/
-// @version      1.6
+// @version      1.7
 // @description  提前输入课程选择, 在选课开通后自动快速勾选
 // @author       Aluria
 // @match        *://*.ucas.ac.cn:*/*
@@ -9,7 +9,7 @@
 // @grant        none
 // ==/UserScript==
 
-const VERSION = "1.6";
+const VERSION = "1.7";
 
 const config = {
     site: ["https://xkgodj.ucas.ac.cn/", "http://xkgo.ucas.ac.cn:3000/"],
@@ -331,6 +331,72 @@ function showTable() {
         });
     })();
 
+    const copyButton = document.createElement("button");
+    copyButton.innerText = "导出表格到剪切板";
+    copyButton.style.margin = "10px";
+    copyButton.onclick = async () => {
+        const old = JSON.parse(localStorage.getItem("courseList") || "[]");
+        await navigator.clipboard.writeText(JSON.stringify(old));
+        myFloatingNotify("复制完成!");
+    };
+    div.appendChild(copyButton);
+
+    const pasteButton = document.createElement("button");
+    pasteButton.innerText = "从剪切板替换表格";
+    pasteButton.style.margin = "10px";
+    pasteButton.style.backgroundColor = "orangered";
+    pasteButton.style.fontWeight = "bold";
+    pasteButton.style.color = "white";
+    async function replaceClipboard(text) {
+        try {
+            const json = JSON.parse(text);
+            if (
+                typeof json !== "object" || !(json instanceof Array) ||
+                json.length <= 0
+            ) {
+                throw new Error("Clipboard text format error");
+            }
+            for (let i = 0; i < json.length; i++) {
+                const d = json[i];
+                if (!d || !d.idFull) {
+                    throw new Error(
+                        `Clipboard text format error in json[${i}]: ${
+                            JSON.stringify(d)
+                        }`,
+                    );
+                }
+            }
+            const old = JSON.parse(localStorage.getItem("courseList") || "[]");
+            localStorage.setItem("courseList", JSON.stringify(json));
+            await navigator.clipboard.writeText(JSON.stringify(old));
+        } catch (e) {
+            console.log(e);
+            notifyMe(e.toString());
+        }
+        showTable();
+    }
+    pasteButton.onclick = async () => {
+        const text = await navigator.clipboard.readText();
+        replaceClipboard(text);
+    };
+    div.appendChild(pasteButton);
+
+    div.append("或粘贴到此处: ");
+
+    const pasteArea = document.createElement("div");
+    pasteArea.contentEditable = true;
+    pasteArea.style.display = "inline-block";
+    pasteArea.style.width = "100px";
+    pasteArea.style.height = "1.5rem";
+    pasteArea.style.overflow = "hidden";
+    pasteArea.style.backgroundColor = "lightgray";
+    pasteArea.addEventListener("mouseout", async () => {
+        console.log(pasteArea.innerText);
+        JSON.parse(pasteArea.innerText);
+        await replaceClipboard(pasteArea.innerText);
+    });
+    div.appendChild(pasteArea);
+
     const courseList = JSON.parse(localStorage.getItem("courseList") || "[]");
     div.appendChild(createTable(courseList));
 
@@ -368,6 +434,14 @@ function showTable() {
     };
     div.appendChild(editButton);
 
+    const manualQuery = document.createElement("button");
+    manualQuery.innerText = "点击一键查询";
+    manualQuery.style.margin = "10px";
+    manualQuery.style.backgroundColor = "lightblue";
+    manualQuery.onclick = autoQuery;
+    div.appendChild(manualQuery);
+
+
     const manualSelect = document.createElement("button");
     manualSelect.innerText = "点击一键选课";
     manualSelect.style.margin = "10px";
@@ -384,7 +458,9 @@ function showTable() {
         "<code style='color: darkred;font-weight: bold;background-color: lightgray;padding: 0px 5px;border-radius: 3px;'>～</code> 键依序查找";
     manualSearch.style.margin = "10px";
     manualSearch.onclick = () => {
-        state.table_row = document.querySelectorAll("tr:not(#ucas-course-helper tr)");
+        state.table_row = document.querySelectorAll(
+            "tr:not(#ucas-course-helper tr)",
+        );
         state.tableStr = [];
         for (let i = 0; i < state.table_row.length; i++) {
             state.tableStr.push(
@@ -588,6 +664,11 @@ function searchWithIndex() {
     return true;
 }
 
+function autoQuery() {
+    $("#courseType>option").prop("selected", true);
+    $("#submitBtn").click();
+}
+
 function main() {
     window.addEventListener("keydown", function (e) {
         if (e.code !== "Backquote" && e.key !== "`") {
@@ -612,7 +693,7 @@ function main() {
     // }
 }
 
-setTimeout(main, 200);
+setTimeout(main, 50);
 
 // selCourses();
 console.log(main);
