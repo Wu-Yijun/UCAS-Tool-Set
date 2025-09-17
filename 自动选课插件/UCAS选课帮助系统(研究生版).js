@@ -455,20 +455,7 @@ function showTable() {
     manualSearch.innerHTML =
         "<code style='color: darkred;font-weight: bold;background-color: lightgray;padding: 0px 5px;border-radius: 3px;'>～</code> 键依序查找";
     manualSearch.style.margin = "10px";
-    manualSearch.onclick = () => {
-        state.table_row = document.querySelectorAll(
-            "tr:not(#ucas-course-helper tr)",
-        );
-        state.tableStr = [];
-        for (let i = 0; i < state.table_row.length; i++) {
-            state.tableStr.push(
-                state.table_row[i].innerText,
-            );
-        }
-        state.searchIndex = 0;
-        searchWithIndex();
-        showTable();
-    };
+    manualSearch.onclick = restartSearch;
     div.appendChild(manualSearch);
 
     const ani_input = document.createElement("span");
