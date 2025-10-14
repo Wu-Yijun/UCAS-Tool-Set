@@ -267,8 +267,8 @@ ${args.join("\n")}
     }
 
     const ai = new AI();
-    const question_title = $(".qst-name");
-    const question_options = $(".el-radio-group");
+    const question_title = document.querySelector(".qst-name")[0];
+    const question_options = document.querySelector(".el-radio-group")[0];
 
     const state = {
       answer: null,
@@ -323,3 +323,4 @@ ${args.join("\n")}
 
   main();
 })();
+
