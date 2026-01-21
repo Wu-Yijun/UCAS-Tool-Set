@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         UCAS 选课帮助系统(研究生版)
 // @namespace    http://tampermonkey.net/
-// @version      2.0
+// @version      2.1
 // @description  提前输入课程选择, 在选课开通后自动快速勾选
 // @author       Aluria
 // @match        *://*.ucas.ac.cn:*/*
@@ -10,7 +10,7 @@
 // @grant        GM_getValue
 // ==/UserScript==
 
-const VERSION = "2.0";
+const VERSION = "2.1";
 
 const state = {
   editing: false,
@@ -19,8 +19,14 @@ const state = {
   table_row: [], // HTML Collection
   tableStr: [],
   searchExist: false,
-  show_animate: false,
   closed: false,
+};
+
+const config = GM_getValue("config", { show_animate: false, enable_system_notify: true });
+GM_setValue("config", config);
+
+function saveConfig() {
+  GM_setValue("config", config);
 };
 
 function myFloatingNotify(text, dt) {
@@ -90,7 +96,9 @@ function myFloatingNotify(text, dt) {
 // 这里负责通知
 function notifyMe(msg) {
   console.debug("notifyMe:", msg);
-  if (!("Notification" in window)) {
+  if (config.enable_system_notify === false) {
+    myFloatingNotify(msg, 3000);
+  } else if (!("Notification" in window)) {
     // Check if the browser supports notifications
     alert("This browser does not support desktop notification");
   } else if (Notification.permission === "granted") {
@@ -168,7 +176,7 @@ function createTable(courseList) {
   table.style.borderCollapse = "collapse";
   table.style.width = "100%";
   table.style.textAlign = "center";
-  table.addEventListener("mousedown", (e)=>e.stopPropagation());
+  table.addEventListener("mousedown", (e) => e.stopPropagation());
   const thead = document.createElement("thead");
   const headerRow = document.createElement("tr");
   const headers = ["#", "课程中文名", "课程ID", "院系", "教师", "状态", "操作"];
@@ -375,6 +383,27 @@ function showTable() {
   };
   div.appendChild(pasteButton);
 
+  const ani_input = document.createElement("span");
+  ani_input.innerHTML = "&emsp;显示滚动动画 <input type='checkbox' style='scale: 1.5;margin: 0 5px;'>";
+  const ani_checkbox = ani_input.children[0];
+  ani_checkbox.checked = config.show_animate;
+  ani_checkbox.addEventListener("change", () => {
+    config.show_animate = ani_checkbox.checked;
+    saveConfig();
+  });
+  div.appendChild(ani_input);
+
+  
+  const use_notify = document.createElement("span");
+  use_notify.innerHTML = "&emsp;使用系统通知 <input type='checkbox' style='scale: 1.5;margin: 0 5px;'>";
+  const use_notify_check = use_notify.children[0];
+  use_notify_check.checked = config.enable_system_notify;
+  use_notify_check.addEventListener("change", () => {
+    config.enable_system_notify = use_notify_check.checked;
+    saveConfig();
+  });
+  div.appendChild(use_notify);
+
   // div.append("或粘贴到此处: ");
 
   // const pasteArea = document.createElement("div");
@@ -453,15 +482,6 @@ function showTable() {
   manualSearch.onclick = restartSearch;
   div.appendChild(manualSearch);
 
-  const ani_input = document.createElement("span");
-  ani_input.innerHTML = "<input type='checkbox'>显示滚动动画 ";
-  const ani_checkbox = ani_input.children[0];
-  ani_checkbox.checked = state.show_animate;
-  ani_checkbox.addEventListener("change", () => {
-    console.log("11111");
-    state.show_animate = ani_checkbox.checked;
-  });
-  div.appendChild(ani_input);
 
   const closeButton = document.createElement("button");
   closeButton.innerText = "关闭";
@@ -593,7 +613,7 @@ function selCourses() {
 function scrollHighlight(elem) {
   if (!elem) return;
 
-  const bh = state.show_animate ? "smooth" : "instant";
+  const bh = config.show_animate ? "smooth" : "instant";
   // 滚动到元素位置
   elem.scrollIntoView({ behavior: bh, block: "center" });
 
