@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         UCAS 选课帮助系统(研究生版)
 // @namespace    http://tampermonkey.net/
-// @version      2.1
+// @version      2.2
 // @description  提前输入课程选择, 在选课开通后自动快速勾选
 // @author       Aluria
 // @match        *://*.ucas.ac.cn:*/*
@@ -10,7 +10,7 @@
 // @grant        GM_getValue
 // ==/UserScript==
 
-const VERSION = "2.1";
+const VERSION = "2.2";
 
 const state = {
   editing: false,
@@ -22,12 +22,32 @@ const state = {
   closed: false,
 };
 
+
+
+GM_setValue = GM_setValue ?? function (key, val) {
+  localStorage.setItem(key, JSON.stringify(val));
+};
+GM_getValue = GM_getValue ?? function (key, val) {
+  JSON.parse(localStorage.getItem(key) ?? JSON.stringify(val));
+};
+
 const config = GM_getValue("config", { show_animate: false, enable_system_notify: true });
 GM_setValue("config", config);
 
 function saveConfig() {
   GM_setValue("config", config);
 };
+
+function saveCourseList(courseList) {
+  courseList.forEach(item => {
+    for (const k of Object.keys(item)) {
+      if (item[k] === undefined || item[k] === null || typeof item[k] === "string") {
+        item[k] = item[k]?.trim() ?? "";
+      }
+    }
+  })
+  GM_setValue("courseList", courseList);
+}
 
 function myFloatingNotify(text, dt) {
   const defaultDt = 1000;
@@ -163,7 +183,7 @@ function deleteClick(event) {
   } else {
     const courseList = GM_getValue("courseList", []);
     courseList.splice(index, 1);
-    GM_setValue("courseList", courseList);
+    saveCourseList(courseList);
   }
   showTable();
 }
@@ -285,7 +305,7 @@ function saveTable(skipped = [], addOne = false) {
       selected: false,
     });
   }
-  GM_setValue("courseList", newList);
+  saveCourseList(newList);
 }
 
 function showTable() {
@@ -369,7 +389,7 @@ function showTable() {
         }
       }
       const old = GM_getValue("courseList", []);
-      GM_setValue("courseList", json);
+    saveCourseList(json);
       await navigator.clipboard.writeText(JSON.stringify(old));
     } catch (e) {
       console.log(e);
@@ -393,7 +413,7 @@ function showTable() {
   });
   div.appendChild(ani_input);
 
-  
+
   const use_notify = document.createElement("span");
   use_notify.innerHTML = "&emsp;使用系统通知 <input type='checkbox' style='scale: 1.5;margin: 0 5px;'>";
   const use_notify_check = use_notify.children[0];
@@ -584,7 +604,7 @@ function selCourses() {
     }
     notifyMe(str);
 
-    GM_setValue("courseList", courseList);
+    saveCourseList(courseList);
   } else {
     let str = "啥也没选上！";
     const except = courseList.filter((c) => c.selected).map((c) => c.name);
@@ -693,10 +713,7 @@ function autoQuery() {
 function main() {
   // GM_setValue
   if (GM_getValue("courseList", []).length === 0) {
-    GM_setValue(
-      "courseList",
-      JSON.parse(localStorage.getItem("courseList") || "[]"),
-    );
+    saveCourseList(JSON.parse(localStorage.getItem("courseList") || "[]"));
   }
 
   window.addEventListener("keydown", function (e) {
@@ -713,13 +730,6 @@ function main() {
   });
   showTable();
 }
-
-GM_setValue = GM_setValue ?? function (key, val) {
-  localStorage.setItem(key, JSON.stringify(val));
-};
-GM_getValue = GM_getValue ?? function (key, val) {
-  JSON.parse(localStorage.getItem(key) ?? JSON.stringify(val));
-};
 
 setTimeout(main, 50);
 
