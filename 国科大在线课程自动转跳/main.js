@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         国科大在线(慕课)快捷跳转
 // @namespace    http://tampermonkey.net/
-// @version      1.1
+// @version      1.2
 // @description  利用悬浮窗触发跨域多步自动跳转，基于状态机管理生命周期
 // @author       Aluria
 // @match        https://sep.ucas.ac.cn/appStoreStudent*
@@ -34,8 +34,17 @@
   const PAGE_MY_SPACE_URL = "http://i.mooc.ucas.edu.cn/"; // MySpace 页面的确切 URL 或域名
   const PAGE_MY_SPACE_URL_INNER = "https://mooc.ucas.edu.cn/courselist/mycourse";
   const PAGE_MY_SPACE_URL_OUTER = "https://i.mooc.ucas.edu.cn/space/index";
-  const PAGE_MY_COURSE_URL = "https://mooc.mooc.ucas.edu.cn/mycourse";
-  const PAGE_MOOC_COURSE_URL = "https://mooc.mooc.ucas.edu.cn/mooc-ans/";
+
+  const courseRelated = [
+    "https://mooc.mooc.ucas.edu.cn/mycourse",
+    "https://mooc.mooc.ucas.edu.cn/mooc-ans/mycourse/studentcourse",
+    "https://mobilelearn.mooc.ucas.edu.cn/widget/pcpick/stu/index",
+    "https://mooc.mooc.ucas.edu.cn/mooc-ans/moocAnalysis",
+    "https://mooc.mooc.ucas.edu.cn/mooc-ans/coursedata",
+    "https://mooc.mooc.ucas.edu.cn/mooc-ans/schoolCourseInfo/getNotifyList",
+    "https://mooc.mooc.ucas.edu.cn/mooc-ans/work/getAllWork",
+    "https://mooc.mooc.ucas.edu.cn/mooc-ans/bbscircle",
+  ];
 
 
   const SUB_CLASS = ["资料", "作业", "通知", "首页"];
@@ -175,13 +184,12 @@
   // (由于没有 tailwind css, 就不做界面了)
   // ==========================================
   function renderBackButton() {
-    // 如果不是 A 页面，不渲染悬浮窗
-    let kind = null;
-    if (window.location.href.includes(PAGE_MY_COURSE_URL)) kind = "course";
-    if (window.location.href.includes(PAGE_MOOC_COURSE_URL)) kind = "course";
-    if (!kind) return;
+    // 如果不是 Course 页面，不渲染悬浮窗
+    if (!courseRelated.some(x => window.location.href.startsWith(x))) return;
     // 避免重复注入
     if (document.getElementById('nav-helper-container')) return;
+    // 仅在顶层 document 创建
+    if (window.top !== window) return;
 
     // 创建容器 (移除原来的 group class)
     const container = document.createElement('div');
